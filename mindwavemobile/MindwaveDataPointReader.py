@@ -4,6 +4,7 @@ import collections
 
 from .MindwavePacketPayloadParser import MindwavePacketPayloadParser
 
+
 class MindwaveDataPointReader:
     def __init__(self, address=None):
         self._mindwaveMobileRawReader = MindwaveMobileRawReader(address=address)
@@ -22,39 +23,44 @@ class MindwaveDataPointReader:
 
     def _moreDataPointsInQueue(self):
         return len(self._dataPointQueue) > 0
-    
+
     def _getDataPointFromQueue(self):
-        return self._dataPointQueue.pop();
-    
+        return self._dataPointQueue.pop()
+
     def _putNextDataPointsInQueue(self):
         dataPoints = self._readDataPointsFromOnePacket()
         self._dataPointQueue.extend(dataPoints)
-    
+
     def _readDataPointsFromOnePacket(self):
         self._goToStartOfNextPacket()
         payloadBytes, checkSum = self._readOnePacket()
-        if (not self._checkSumIsOk(payloadBytes, checkSum)):
+
+        # qc ###############################################################
+        if not self._checkSumIsOk(payloadBytes, checkSum):
             print("checksum of packet was not correct, discarding packet...")
-            return self._readDataPointsFromOnePacket();
+            return self._readDataPointsFromOnePacket()
         else:
             dataPoints = self._readDataPointsFromPayload(payloadBytes)
         self._mindwaveMobileRawReader.clearAlreadyReadBuffer()
-        return dataPoints;
-        
+        return dataPoints
+        # qc ###############################################################
+
+
+
     def _goToStartOfNextPacket(self):
-        while(True):
+        while True:
             byte = self._mindwaveMobileRawReader.getByte()
-            if (byte == MindwaveMobileRawReader.START_OF_PACKET_BYTE):  # need two of these bytes at the start..
+            if byte == MindwaveMobileRawReader.START_OF_PACKET_BYTE:  # need two of these bytes at the start..
                 byte = self._mindwaveMobileRawReader.getByte()
-                if (byte == MindwaveMobileRawReader.START_OF_PACKET_BYTE):
+                if byte == MindwaveMobileRawReader.START_OF_PACKET_BYTE:
                     # now at the start of the packet..
-                    return;
+                    return
 
     def _readOnePacket(self):
-            payloadLength = self._readPayloadLength();
-            payloadBytes, checkSum = self._readPacket(payloadLength);
-            return payloadBytes, checkSum
-    
+        payloadLength = self._readPayloadLength()
+        payloadBytes, checkSum = self._readPacket(payloadLength)
+        return payloadBytes, checkSum
+
     def _readPayloadLength(self):
         payloadLength = self._mindwaveMobileRawReader.getByte()
         return payloadLength
@@ -67,16 +73,12 @@ class MindwaveDataPointReader:
     def _checkSumIsOk(self, payloadBytes, checkSum):
         sumOfPayload = sum(payloadBytes)
         lastEightBits = sumOfPayload % 256
-        invertedLastEightBits = self._computeOnesComplement(lastEightBits) #1's complement!
-        return invertedLastEightBits == checkSum;
-    
+        invertedLastEightBits = self._computeOnesComplement(lastEightBits)  # 1's complement!
+        return invertedLastEightBits == checkSum
+
     def _computeOnesComplement(self, lastEightBits):
         return ~lastEightBits + 256
-        
+
     def _readDataPointsFromPayload(self, payloadBytes):
         payloadParser = MindwavePacketPayloadParser(payloadBytes)
         return payloadParser.parseDataPoints();
-    
-    
-    
-    
